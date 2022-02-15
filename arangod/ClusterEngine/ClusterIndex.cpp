@@ -87,7 +87,8 @@ ClusterIndex::ClusterIndex(IndexId id, LogicalCollection& collection,
     } else if (_indexType == TRI_IDX_TYPE_PRIMARY_INDEX) {
       // The Primary Index on RocksDB can serve _key and _id when being asked.
       _coveredFields = ::primaryIndexAttributes;
-    } else if (_indexType == TRI_IDX_TYPE_PERSISTENT_INDEX) {
+    } else if (_indexType == TRI_IDX_TYPE_PERSISTENT_INDEX ||
+               _indexType == TRI_IDX_TYPE_HASHVALUE_INDEX) {
       _coveredFields = Index::mergeFields(
           _fields, Index::parseFields(
                        info.get(arangodb::StaticStrings::IndexStoredValues),
@@ -99,7 +100,8 @@ ClusterIndex::ClusterIndex(IndexId id, LogicalCollection& collection,
       _estimates = true;
     } else if (_indexType == TRI_IDX_TYPE_HASH_INDEX ||
                _indexType == TRI_IDX_TYPE_SKIPLIST_INDEX ||
-               _indexType == TRI_IDX_TYPE_PERSISTENT_INDEX) {
+               _indexType == TRI_IDX_TYPE_PERSISTENT_INDEX ||
+               _indexType == TRI_IDX_TYPE_HASHVALUE_INDEX) {
       if (VPackSlice s = info.get(StaticStrings::IndexEstimates);
           s.isBoolean()) {
         _estimates = s.getBoolean();
@@ -128,7 +130,8 @@ void ClusterIndex::toVelocyPack(
 
   if (_indexType == Index::TRI_IDX_TYPE_HASH_INDEX ||
       _indexType == Index::TRI_IDX_TYPE_SKIPLIST_INDEX ||
-      _indexType == Index::TRI_IDX_TYPE_PERSISTENT_INDEX) {
+      _indexType == Index::TRI_IDX_TYPE_PERSISTENT_INDEX ||
+      _indexType == Index::TRI_IDX_TYPE_HASHVALUE_INDEX) {
     builder.add(StaticStrings::IndexEstimates, VPackValue(_estimates));
   }
 
@@ -156,7 +159,8 @@ bool ClusterIndex::hasSelectivityEstimate() const {
            _indexType == Index::TRI_IDX_TYPE_TTL_INDEX ||
            (_estimates && (_indexType == Index::TRI_IDX_TYPE_HASH_INDEX ||
                            _indexType == Index::TRI_IDX_TYPE_SKIPLIST_INDEX ||
-                           _indexType == Index::TRI_IDX_TYPE_PERSISTENT_INDEX));
+                           _indexType == Index::TRI_IDX_TYPE_PERSISTENT_INDEX ||
+                           _indexType == Index::TRI_IDX_TYPE_HASHVALUE_INDEX));
 #ifdef ARANGODB_USE_GOOGLE_TESTS
   } else if (_engineType == ClusterEngineType::MockEngine) {
     return false;
@@ -236,7 +240,8 @@ bool ClusterIndex::hasCoveringIterator() const {
            _indexType == Index::TRI_IDX_TYPE_HASH_INDEX ||
            _indexType == Index::TRI_IDX_TYPE_SKIPLIST_INDEX ||
            _indexType == Index::TRI_IDX_TYPE_TTL_INDEX ||
-           _indexType == Index::TRI_IDX_TYPE_PERSISTENT_INDEX;
+           _indexType == Index::TRI_IDX_TYPE_PERSISTENT_INDEX ||
+           _indexType == Index::TRI_IDX_TYPE_HASHVALUE_INDEX;
   }
   return false;
 }
@@ -266,11 +271,6 @@ Index::FilterCosts ClusterIndex::supportsFilterCondition(
       return matcher.matchOne(this, node, reference, itemsInIndex);
     }
     case TRI_IDX_TYPE_EDGE_INDEX: {
-      if (_engineType == ClusterEngineType::RocksDBEngine) {
-        SimpleAttributeEqualityMatcher matcher(this->_fields);
-        return matcher.matchOne(this, node, reference, itemsInIndex);
-      }
-      // other...
       SimpleAttributeEqualityMatcher matcher(this->_fields);
       return matcher.matchOne(this, node, reference, itemsInIndex);
     }
@@ -299,6 +299,11 @@ Index::FilterCosts ClusterIndex::supportsFilterCondition(
       // should not be called for these indexes
       return Index::supportsFilterCondition(allIndexes, node, reference,
                                             itemsInIndex);
+    }
+
+    case TRI_IDX_TYPE_HASHVALUE_INDEX: {
+      SimpleAttributeEqualityMatcher matcher(this->_fields);
+      return matcher.matchOne(this, node, reference, itemsInIndex);
     }
 
     case TRI_IDX_TYPE_ZKD_INDEX:
@@ -348,6 +353,7 @@ Index::SortCosts ClusterIndex::supportsSortCondition(
     }
 
     case TRI_IDX_TYPE_ZKD_INDEX:
+    case TRI_IDX_TYPE_HASHVALUE_INDEX:
       // Sorting not supported
       return Index::SortCosts{};
 
@@ -402,6 +408,11 @@ aql::AstNode* ClusterIndex::specializeCondition(
 
     case TRI_IDX_TYPE_ZKD_INDEX:
       return zkd::specializeCondition(this, node, reference);
+
+    case TRI_IDX_TYPE_HASHVALUE_INDEX: {
+      SimpleAttributeEqualityMatcher matcher(this->_fields);
+      return matcher.specializeOne(this, node, reference);
+    }
 
     case TRI_IDX_TYPE_UNKNOWN:
       break;

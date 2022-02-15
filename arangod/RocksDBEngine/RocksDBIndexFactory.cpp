@@ -32,6 +32,7 @@
 #include "RocksDBEngine/RocksDBFulltextIndex.h"
 #include "RocksDBEngine/RocksDBGeoIndex.h"
 #include "RocksDBEngine/RocksDBHashIndex.h"
+#include "RocksDBEngine/RocksDBHashvalueIndex.h"
 #include "RocksDBEngine/RocksDBPersistentIndex.h"
 #include "RocksDBEngine/RocksDBPrimaryIndex.h"
 #include "RocksDBEngine/RocksDBSkiplistIndex.h"
@@ -379,6 +380,9 @@ RocksDBIndexFactory::RocksDBIndexFactory(ArangodServer& server)
   static const ZkdIndexFactory zkdIndexFactory(server);
   static const iresearch::IResearchRocksDBInvertedIndexFactory
       iresearchInvertedIndexFactory(server);
+  static const SecondaryIndexFactory<RocksDBHashvalueIndex,
+                                     Index::TRI_IDX_TYPE_HASHVALUE_INDEX>
+      hashvalueIndexFactory(server);
 
   emplace("edge", edgeIndexFactory);
   emplace("fulltext", fulltextIndexFactory);
@@ -394,6 +398,7 @@ RocksDBIndexFactory::RocksDBIndexFactory(ArangodServer& server)
   emplace("zkd", zkdIndexFactory);
   emplace(arangodb::iresearch::IRESEARCH_INVERTED_INDEX_TYPE.data(),
           iresearchInvertedIndexFactory);
+  emplace("hashvalue", hashvalueIndexFactory);
 }
 
 /// @brief index name aliases (e.g. "persistent" => "hash", "skiplist" =>

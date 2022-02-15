@@ -79,6 +79,11 @@ RocksDBKeyBounds RocksDBKeyBounds::UniqueVPackIndex(uint64_t indexId,
                           reverse);
 }
 
+RocksDBKeyBounds RocksDBKeyBounds::HashvalueIndex(uint64_t indexId) {
+  return RocksDBKeyBounds(RocksDBEntryType::HashvalueIndexValue, indexId,
+                          false);
+}
+
 RocksDBKeyBounds RocksDBKeyBounds::FulltextIndex(uint64_t indexId) {
   return RocksDBKeyBounds(RocksDBEntryType::FulltextIndexValue, indexId);
 }
@@ -102,6 +107,12 @@ RocksDBKeyBounds RocksDBKeyBounds::VPackIndex(uint64_t indexId,
                                               VPackSlice const& right) {
   return RocksDBKeyBounds(RocksDBEntryType::VPackIndexValue, indexId, left,
                           right);
+}
+
+RocksDBKeyBounds RocksDBKeyBounds::HashvalueIndex(uint64_t indexId,
+                                                  uint64_t hashvalue) {
+  return RocksDBKeyBounds(RocksDBEntryType::HashvalueIndexValue, indexId,
+                          hashvalue);
 }
 
 RocksDBKeyBounds RocksDBKeyBounds::ZkdIndex(uint64_t indexId) {
@@ -198,6 +209,7 @@ uint64_t RocksDBKeyBounds::objectId() const {
     case RocksDBEntryType::EdgeIndexValue:
     case RocksDBEntryType::VPackIndexValue:
     case RocksDBEntryType::UniqueVPackIndexValue:
+    case RocksDBEntryType::HashvalueIndexValue:
     case RocksDBEntryType::LegacyGeoIndexValue:
     case RocksDBEntryType::GeoIndexValue:
     case RocksDBEntryType::FulltextIndexValue: {
@@ -242,6 +254,9 @@ rocksdb::ColumnFamilyHandle* RocksDBKeyBounds::columnFamily() const {
     case RocksDBEntryType::ZkdIndexValue:
       return RocksDBColumnFamilyManager::get(
           RocksDBColumnFamilyManager::Family::ZkdIndex);
+    case RocksDBEntryType::HashvalueIndexValue:
+      return RocksDBColumnFamilyManager::get(
+          RocksDBColumnFamilyManager::Family::HashvalueIndex);
     case RocksDBEntryType::LogEntry:
       return RocksDBColumnFamilyManager::get(
           RocksDBColumnFamilyManager::Family::ReplicatedLogs);
@@ -395,6 +410,16 @@ RocksDBKeyBounds::RocksDBKeyBounds(RocksDBEntryType type, uint64_t first)
       break;
     }
 
+    case RocksDBEntryType::HashvalueIndexValue: {
+      size_t length = 2 * sizeof(uint64_t) + 1;
+      _internals.reserve(length);
+      uint64ToPersistent(_internals.buffer(), first);
+      _internals.separate();
+      uint64ToPersistent(_internals.buffer(), first);
+      _internals.push_back(0xFFU);
+      break;
+    }
+
     default:
       THROW_ARANGO_EXCEPTION(TRI_ERROR_BAD_PARAMETER);
   }
@@ -429,9 +454,45 @@ RocksDBKeyBounds::RocksDBKeyBounds(RocksDBEntryType type, uint64_t first,
       break;
     }
 
+    case RocksDBEntryType::HashvalueIndexValue: {
+      _internals.reserve(2 * sizeof(uint64_t));
+      uint64ToPersistent(_internals.buffer(), first);
+      _internals.separate();
+      // TO DO: check for overflow of first!
+      uint64ToPersistent(_internals.buffer(), first + 1);
+      break;
+    }
+
     default:
       THROW_ARANGO_EXCEPTION(TRI_ERROR_BAD_PARAMETER);
   }
+}
+
+void RocksDBKeyBounds::reset(RocksDBEntryType type, uint64_t first,
+                             uint64_t second) {
+  TRI_ASSERT(type == _type);
+  switch (type) {
+    case RocksDBEntryType::HashvalueIndexValue: {
+      _internals.clear();
+      _internals.reserve(4 * sizeof(uint64_t));
+      uint64ToPersistent(_internals.buffer(), first);
+      uint64ToPersistent(_internals.buffer(), second);
+      _internals.separate();
+      uint64ToPersistent(_internals.buffer(), first);
+      // TODO: check for overflow of second
+      uint64ToPersistent(_internals.buffer(), second + 1);
+      break;
+    }
+
+    default:
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_BAD_PARAMETER);
+  }
+}
+
+RocksDBKeyBounds::RocksDBKeyBounds(RocksDBEntryType type, uint64_t first,
+                                   uint64_t second)
+    : _type(type) {
+  reset(type, first, second);
 }
 
 /// bounds to iterate over specified word or edge

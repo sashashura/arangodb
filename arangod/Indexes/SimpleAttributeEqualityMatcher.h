@@ -43,10 +43,16 @@ class SimpleAttributeEqualityMatcher {
   explicit SimpleAttributeEqualityMatcher(
       std::vector<std::vector<arangodb::basics::AttributeName>> const&);
 
- public:
   /// @brief match a single of the attributes
   /// this is used for the primary index and the edge index
   Index::FilterCosts matchOne(arangodb::Index const* index,
+                              arangodb::aql::AstNode const* node,
+                              arangodb::aql::Variable const* reference,
+                              size_t itemsInIndex);
+
+  /// @brief match all of the attributes, in any order
+  /// this is used for the hashvalue index
+  Index::FilterCosts matchAll(arangodb::Index const* index,
                               arangodb::aql::AstNode const* node,
                               arangodb::aql::Variable const* reference,
                               size_t itemsInIndex);
@@ -63,6 +69,13 @@ class SimpleAttributeEqualityMatcher {
   /// this is used for the primary index and the edge index
   /// requires that a previous matchOne() returned true
   arangodb::aql::AstNode* specializeOne(arangodb::Index const*,
+                                        arangodb::aql::AstNode*,
+                                        arangodb::aql::Variable const*);
+
+  /// @brief specialize the condition for the index
+  /// this is used for the hashvalue index
+  /// requires that a previous matchAll() returned true
+  arangodb::aql::AstNode* specializeAll(arangodb::Index const*,
                                         arangodb::aql::AstNode*,
                                         arangodb::aql::Variable const*);
 

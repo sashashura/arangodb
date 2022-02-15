@@ -59,6 +59,7 @@ enum class RocksDBEntryType : char {
   ReplicatedLog = 'l',
   ZkdIndexValue = 'z',
   UniqueZkdIndexValue = 'Z',
+  HashvalueIndexValue = 'h',
 };
 
 char const* rocksDBEntryTypeName(RocksDBEntryType);

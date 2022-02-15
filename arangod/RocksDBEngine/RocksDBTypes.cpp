@@ -160,6 +160,13 @@ static rocksdb::Slice UniqueZdkIndexValue(
     reinterpret_cast<std::underlying_type<RocksDBEntryType>::type*>(
         &uniqueZkdIndexValue),
     1);
+
+static RocksDBEntryType hashvalueIndexValue =
+    RocksDBEntryType::HashvalueIndexValue;
+static rocksdb::Slice HashvalueIndexValue(
+    reinterpret_cast<std::underlying_type<RocksDBEntryType>::type*>(
+        &hashvalueIndexValue),
+    1);
 }  // namespace
 
 char const* arangodb::rocksDBEntryTypeName(arangodb::RocksDBEntryType type) {
@@ -204,6 +211,8 @@ char const* arangodb::rocksDBEntryTypeName(arangodb::RocksDBEntryType type) {
       return "ZkdIndexValue";
     case arangodb::RocksDBEntryType::UniqueZkdIndexValue:
       return "UniqueZkdIndexValue";
+    case arangodb::RocksDBEntryType::HashvalueIndexValue:
+      return "HashvalueIndexValue";
     case RocksDBEntryType::LogEntry:
       return "ReplicatedLogEntry";
     case RocksDBEntryType::ReplicatedLog:
@@ -310,6 +319,8 @@ rocksdb::Slice const& arangodb::rocksDBSlice(RocksDBEntryType const& type) {
       return ZdkIndexValue;
     case RocksDBEntryType::UniqueZkdIndexValue:
       return UniqueZdkIndexValue;
+    case RocksDBEntryType::HashvalueIndexValue:
+      return HashvalueIndexValue;
     case RocksDBEntryType::LogEntry:
       return LogEntry;
     case RocksDBEntryType::ReplicatedLog:

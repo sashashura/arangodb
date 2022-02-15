@@ -1532,6 +1532,11 @@ void RocksDBCollection::figuresSpecific(
                   snapshot, true);
             }
             break;
+          case Index::TRI_IDX_TYPE_HASHVALUE_INDEX:
+            count = rocksutils::countKeyRange(
+                db, RocksDBKeyBounds::HashvalueIndex(rix->objectId(), false),
+                snapshot, true);
+            break;
           case Index::TRI_IDX_TYPE_EDGE_INDEX:
             count = rocksutils::countKeyRange(
                 db, RocksDBKeyBounds::EdgeIndex(rix->objectId()), snapshot,

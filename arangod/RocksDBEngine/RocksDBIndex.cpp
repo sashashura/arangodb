@@ -425,6 +425,8 @@ RocksDBKeyBounds RocksDBIndex::getBounds(Index::IndexType type,
       return RocksDBKeyBounds::DatabaseViews(objectId);
     case RocksDBIndex::TRI_IDX_TYPE_ZKD_INDEX:
       return RocksDBKeyBounds::ZkdIndex(objectId);
+    case RocksDBIndex::TRI_IDX_TYPE_HASHVALUE_INDEX:
+      return RocksDBKeyBounds::HashvalueIndex(objectId);
     case RocksDBIndex::TRI_IDX_TYPE_UNKNOWN:
     default:
       THROW_ARANGO_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);

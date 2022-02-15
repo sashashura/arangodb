@@ -333,6 +333,9 @@ Index::IndexType Index::type(std::string_view type) {
   if (type == arangodb::iresearch::IRESEARCH_INVERTED_INDEX_TYPE) {
     return TRI_IDX_TYPE_INVERTED_INDEX;
   }
+  if (type == "hashvalue") {
+    return TRI_IDX_TYPE_HASHVALUE_INDEX;
+  }
   return TRI_IDX_TYPE_UNKNOWN;
 }
 
@@ -373,6 +376,8 @@ char const* Index::oldtypeName(Index::IndexType type) {
       return "zkd";
     case TRI_IDX_TYPE_INVERTED_INDEX:
       return arangodb::iresearch::IRESEARCH_INVERTED_INDEX_TYPE.data();
+    case TRI_IDX_TYPE_HASHVALUE_INDEX:
+      return "hashvalue";
     case TRI_IDX_TYPE_UNKNOWN: {
     }
   }

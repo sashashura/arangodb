@@ -126,6 +126,9 @@ class RocksDBKey {
   void constructUniqueVPackIndexValue(uint64_t indexId,
                                       VPackSlice const& indexValues);
 
+  void constructHashvalueIndexValue(uint64_t indexId, uint64_t hash,
+                                    LocalDocumentId docId);
+
   //////////////////////////////////////////////////////////////////////////////
   /// @brief Create a fully-specified key for the fulltext index
   //////////////////////////////////////////////////////////////////////////////
@@ -281,6 +284,8 @@ class RocksDBKey {
   //////////////////////////////////////////////////////////////////////////////
   static VPackSlice indexedVPack(RocksDBKey const&);
   static VPackSlice indexedVPack(rocksdb::Slice const&);
+
+  static uint64_t hashvalue(rocksdb::Slice const&);
 
   //////////////////////////////////////////////////////////////////////////////
   /// @brief Extracts the geospatial cell id

@@ -56,6 +56,8 @@ class RocksDBValue {
   static RocksDBValue EdgeIndexValue(std::string_view vertexId);
   static RocksDBValue VPackIndexValue();
   static RocksDBValue VPackIndexValue(VPackSlice data);
+  static RocksDBValue HashvalueIndexValue(VPackSlice data,
+                                          VPackSlice storedValues);
   static RocksDBValue ZkdIndexValue();
   static RocksDBValue UniqueZkdIndexValue(LocalDocumentId const& docId);
   static RocksDBValue UniqueVPackIndexValue(LocalDocumentId const& docId);
@@ -111,6 +113,8 @@ class RocksDBValue {
 
   static VPackSlice uniqueIndexStoredValues(rocksdb::Slice const&);
   static VPackSlice indexStoredValues(rocksdb::Slice const&);
+  static VPackSlice hashvalueIndexedVPack(rocksdb::Slice const&);
+  static VPackSlice hashvalueIndexStoredValues(rocksdb::Slice const&);
 
   //////////////////////////////////////////////////////////////////////////////
   /// @brief Centroid of shape or point on the sphere surface in degrees
@@ -163,6 +167,7 @@ class RocksDBValue {
   RocksDBValue(RocksDBEntryType type, LocalDocumentId const& docId,
                VPackSlice data);
   RocksDBValue(RocksDBEntryType type, VPackSlice data);
+  RocksDBValue(RocksDBEntryType type, VPackSlice data, VPackSlice storedValues);
   RocksDBValue(RocksDBEntryType type, std::string_view data);
   RocksDBValue(RocksDBEntryType type, replication2::PersistingLogEntry const&);
   explicit RocksDBValue(S2Point const&);

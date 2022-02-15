@@ -65,6 +65,12 @@ RocksDBValue RocksDBValue::VPackIndexValue(VPackSlice data) {
   return RocksDBValue(RocksDBEntryType::VPackIndexValue, data);
 }
 
+RocksDBValue RocksDBValue::HashvalueIndexValue(VPackSlice data,
+                                               VPackSlice storedValues) {
+  return RocksDBValue(RocksDBEntryType::HashvalueIndexValue, data,
+                      storedValues);
+}
+
 RocksDBValue RocksDBValue::ZkdIndexValue() {
   return RocksDBValue(RocksDBEntryType::ZkdIndexValue);
 }
@@ -175,6 +181,22 @@ VPackSlice RocksDBValue::uniqueIndexStoredValues(rocksdb::Slice const& slice) {
   return data(slice.data() + sizeof(uint64_t), slice.size() - sizeof(uint64_t));
 }
 
+VPackSlice RocksDBValue::hashvalueIndexedVPack(rocksdb::Slice const& slice) {
+  VPackSlice payload(reinterpret_cast<uint8_t const*>(slice.data()));
+  TRI_ASSERT(payload.isArray());
+  return data(slice.data(), payload.byteSize());
+}
+
+VPackSlice RocksDBValue::hashvalueIndexStoredValues(
+    rocksdb::Slice const& slice) {
+  VPackSlice payload(reinterpret_cast<uint8_t const*>(slice.data()));
+  TRI_ASSERT(payload.isArray());
+  VPackSlice storedValues(
+      reinterpret_cast<uint8_t const*>(slice.data() + payload.byteSize()));
+  TRI_ASSERT(storedValues.isArray());
+  return data(storedValues.startAs<char>(), storedValues.byteSize());
+}
+
 S2Point RocksDBValue::centroid(rocksdb::Slice const& s) {
   TRI_ASSERT(s.size() == sizeof(double) * 3);
   return S2Point(
@@ -260,6 +282,26 @@ RocksDBValue::RocksDBValue(RocksDBEntryType type, VPackSlice data)
     case RocksDBEntryType::Document:
       TRI_ASSERT(false);  // use for document => get free schellen
       break;
+
+    default:
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_BAD_PARAMETER);
+  }
+}
+
+RocksDBValue::RocksDBValue(RocksDBEntryType type, VPackSlice data,
+                           VPackSlice storedValues)
+    : _type(type), _buffer() {
+  switch (_type) {
+    case RocksDBEntryType::HashvalueIndexValue: {
+      TRI_ASSERT(data.isArray());
+      size_t byteSize = static_cast<size_t>(data.byteSize());
+      size_t storedValuesSize = static_cast<size_t>(storedValues.byteSize());
+      _buffer.reserve(byteSize + storedValuesSize);
+      _buffer.append(reinterpret_cast<char const*>(data.begin()), byteSize);
+      _buffer.append(reinterpret_cast<char const*>(storedValues.begin()),
+                     storedValuesSize);
+      break;
+    }
 
     default:
       THROW_ARANGO_EXCEPTION(TRI_ERROR_BAD_PARAMETER);

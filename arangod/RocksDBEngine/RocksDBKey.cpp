@@ -57,6 +57,7 @@ bool RocksDBKey::containsLocalDocumentId(
     case RocksDBEntryType::Document:
     case RocksDBEntryType::EdgeIndexValue:
     case RocksDBEntryType::VPackIndexValue:
+    case RocksDBEntryType::HashvalueIndexValue:
     case RocksDBEntryType::FulltextIndexValue:
     case RocksDBEntryType::GeoIndexValue: {
       // create a temporary string containing the stringified local document id
@@ -192,6 +193,19 @@ void RocksDBKey::constructUniqueVPackIndexValue(uint64_t indexId,
   _buffer->reserve(keyLength);
   uint64ToPersistent(*_buffer, indexId);
   _buffer->append(reinterpret_cast<char const*>(indexValues.begin()), byteSize);
+  TRI_ASSERT(_buffer->size() == keyLength);
+}
+
+void RocksDBKey::constructHashvalueIndexValue(uint64_t indexId, uint64_t hash,
+                                              LocalDocumentId documentId) {
+  TRI_ASSERT(indexId != 0);
+  _type = RocksDBEntryType::HashvalueIndexValue;
+  size_t keyLength = 3 * sizeof(uint64_t);
+  _buffer->clear();
+  _buffer->reserve(keyLength);
+  uint64ToPersistent(*_buffer, indexId);
+  uint64ToPersistent(*_buffer, hash);
+  uint64ToPersistent(*_buffer, documentId.id());
   TRI_ASSERT(_buffer->size() == keyLength);
 }
 
@@ -418,6 +432,11 @@ VPackSlice RocksDBKey::indexedVPack(RocksDBKey const& key) {
 
 VPackSlice RocksDBKey::indexedVPack(rocksdb::Slice const& slice) {
   return indexedVPack(slice.data(), slice.size());
+}
+
+uint64_t RocksDBKey::hashvalue(rocksdb::Slice const& s) {
+  TRI_ASSERT(s.size() == 3 * sizeof(uint64_t));
+  return uint64FromPersistent(s.data() + sizeof(uint64_t));
 }
 
 uint64_t RocksDBKey::geoValue(rocksdb::Slice const& slice) {

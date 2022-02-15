@@ -99,6 +99,8 @@ class RocksDBKeyBounds {
   //////////////////////////////////////////////////////////////////////////////
   static RocksDBKeyBounds UniqueVPackIndex(uint64_t indexId, bool reverse);
 
+  static RocksDBKeyBounds HashvalueIndex(uint64_t indexId);
+
   //////////////////////////////////////////////////////////////////////////////
   /// @brief Bounds for all entries of a fulltext index
   //////////////////////////////////////////////////////////////////////////////
@@ -137,6 +139,8 @@ class RocksDBKeyBounds {
   //////////////////////////////////////////////////////////////////////////////
   static RocksDBKeyBounds UniqueVPackIndex(uint64_t indexId,
                                            VPackSlice const& left);
+
+  static RocksDBKeyBounds HashvalueIndex(uint64_t indexId, uint64_t hashvalue);
 
   //////////////////////////////////////////////////////////////////////////////
   /// @brief Bounds for all views belonging to a specified database
@@ -211,11 +215,14 @@ class RocksDBKeyBounds {
   // checks if the bounds' internals are empty
   bool empty() const noexcept { return internals().empty(); }
 
+  void reset(RocksDBEntryType type, uint64_t first, uint64_t second);
+
  private:
   RocksDBKeyBounds();
   explicit RocksDBKeyBounds(RocksDBEntryType type);
   RocksDBKeyBounds(RocksDBEntryType type, uint64_t first);
   RocksDBKeyBounds(RocksDBEntryType type, uint64_t first, bool second);
+  RocksDBKeyBounds(RocksDBEntryType type, uint64_t first, uint64_t second);
   RocksDBKeyBounds(RocksDBEntryType type, uint64_t first,
                    std::string_view second);
   RocksDBKeyBounds(RocksDBEntryType type, uint64_t first, VPackSlice second);

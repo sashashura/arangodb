@@ -49,6 +49,7 @@
 #include "Utils/OperationOptions.h"
 #include "VocBase/LogicalCollection.h"
 
+#include <rocksdb/comparator.h>
 #include <rocksdb/iterator.h>
 #include <rocksdb/options.h>
 #include <rocksdb/utilities/transaction.h>
@@ -534,14 +535,14 @@ class RocksDBVPackIndexIterator final : public IndexIterator {
   RocksDBKeyBounds _bounds;
   // used for iterate_upper_bound iterate_lower_bound
   rocksdb::Slice _rangeBound;
-  RocksDBVPackIndexSearchValueFormat _format;
+  RocksDBVPackIndexSearchValueFormat const _format;
   bool _mustSeek;
   bool const _mustCheckBounds;
 };
 
 }  // namespace arangodb
 
-uint64_t RocksDBVPackIndex::HashForKey(const rocksdb::Slice& key) {
+uint64_t RocksDBVPackIndex::HashForKey(rocksdb::Slice const& key) {
   // NOTE: This function needs to use the same hashing on the
   // indexed VPack as the initial inserter does
   VPackSlice tmp = RocksDBKey::indexedVPack(key);
@@ -558,7 +559,6 @@ RocksDBVPackIndex::RocksDBVPackIndex(IndexId iid,
                    /*useCache*/ false),
       _deduplicate(arangodb::basics::VelocyPackHelper::getBooleanValue(
           info, "deduplicate", true)),
-      _allowPartialIndex(true),
       _estimates(true),
       _estimator(nullptr),
       _storedValues(Index::parseFields(
@@ -797,15 +797,13 @@ void RocksDBVPackIndex::buildIndexValues(
 
   // Finally, the complex case, where we have to expand one entry.
   // Note again that at most one step in the attribute path can be
-  // an array step. Furthermore, if _allowPartialIndex is true and
-  // anything goes wrong with this attribute path, we have to bottom out
-  // with None values to be able to use the index for a prefix match.
+  // an array step.
 
   // Trivial case to bottom out with Illegal types.
   VPackSlice illegalSlice = arangodb::velocypack::Slice::illegalSlice();
 
   auto finishWithNones = [&]() -> void {
-    if (!_allowPartialIndex || level == 0) {
+    if (level == 0) {
       return;
     }
     for (size_t i = level; i < _paths.size(); i++) {

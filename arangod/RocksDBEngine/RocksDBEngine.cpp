@@ -938,6 +938,7 @@ void RocksDBEngine::start() {
   addFamily(RocksDBColumnFamilyManager::Family::FulltextIndex);
   addFamily(RocksDBColumnFamilyManager::Family::ReplicatedLogs);
   addFamily(RocksDBColumnFamilyManager::Family::ZkdIndex);
+  addFamily(RocksDBColumnFamilyManager::Family::HashvalueIndex);
 
   size_t const minNumberOfColumnFamilies =
       RocksDBColumnFamilyManager::minNumberOfColumnFamilies;
@@ -1076,6 +1077,8 @@ void RocksDBEngine::start() {
       RocksDBColumnFamilyManager::Family::ReplicatedLogs, cfHandles[7]);
   RocksDBColumnFamilyManager::set(RocksDBColumnFamilyManager::Family::ZkdIndex,
                                   cfHandles[8]);
+  RocksDBColumnFamilyManager::set(
+      RocksDBColumnFamilyManager::Family::HashvalueIndex, cfHandles[9]);
   TRI_ASSERT(RocksDBColumnFamilyManager::get(
                  RocksDBColumnFamilyManager::Family::Definitions)
                  ->GetID() == 0);

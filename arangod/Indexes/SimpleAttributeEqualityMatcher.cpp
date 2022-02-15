@@ -97,6 +97,94 @@ Index::FilterCosts SimpleAttributeEqualityMatcher::matchOne(
   return costs;
 }
 
+/// @brief match all of the attributes, in any order
+/// this is used for the hash index
+Index::FilterCosts SimpleAttributeEqualityMatcher::matchAll(
+    arangodb::Index const* index, arangodb::aql::AstNode const* node,
+    arangodb::aql::Variable const* reference, size_t itemsInIndex) {
+  arangodb::containers::FlatHashSet<std::string> nonNullAttributes;
+  _found.clear();
+  arangodb::aql::AstNode const* which = nullptr;
+
+  size_t postFilterConditions = 0;
+  size_t values = 1;
+  size_t const n = node->numMembers();
+
+  for (size_t i = 0; i < n; ++i) {
+    bool matches = false;
+    auto op = node->getMemberUnchecked(i);
+
+    if (index->sparse() &&
+        (op->type == arangodb::aql::NODE_TYPE_OPERATOR_BINARY_NE ||
+         op->type == arangodb::aql::NODE_TYPE_OPERATOR_BINARY_GT)) {
+      TRI_ASSERT(op->numMembers() == 2);
+
+      // track != null && > null, though no index will use them directly
+      // however, we need to track which attributes are null in order to
+      // use sparse indexes properly
+      accessFitsIndex(index, op->getMember(0), op->getMember(1), op, reference,
+                      nonNullAttributes, false);
+      accessFitsIndex(index, op->getMember(1), op->getMember(0), op, reference,
+                      nonNullAttributes, false);
+    } else if (op->type == arangodb::aql::NODE_TYPE_OPERATOR_BINARY_EQ) {
+      TRI_ASSERT(op->numMembers() == 2);
+
+      if (accessFitsIndex(index, op->getMemberUnchecked(0),
+                          op->getMemberUnchecked(1), op, reference,
+                          nonNullAttributes, false)) {
+        which = op->getMemberUnchecked(1);
+        matches = true;
+      } else if (accessFitsIndex(index, op->getMemberUnchecked(1),
+                                 op->getMemberUnchecked(0), op, reference,
+                                 nonNullAttributes, false)) {
+        which = op->getMemberUnchecked(0);
+        matches = true;
+      }
+    } else if (op->type == arangodb::aql::NODE_TYPE_OPERATOR_BINARY_IN) {
+      TRI_ASSERT(op->numMembers() == 2);
+
+      if (accessFitsIndex(index, op->getMemberUnchecked(0),
+                          op->getMemberUnchecked(1), op, reference,
+                          nonNullAttributes, false)) {
+        which = op->getMemberUnchecked(0);
+        values *= estimateNumberOfArrayMembers(op->getMember(1));
+        matches = true;
+      }
+    }
+
+    if (!matches) {
+      // we cannot use the index for this part of the condition
+      ++postFilterConditions;
+    }
+  }
+
+  if (values == 0) {
+    values = 1;
+  }
+
+  Index::FilterCosts costs = Index::FilterCosts::defaultCosts(itemsInIndex);
+
+  if (_found.size() == _attributes.size()) {
+    // can only use this index if all index attributes are covered by the
+    // condition
+    if (_found.size() == 1) {
+      // single-attribute index
+      TRI_ASSERT(which != nullptr);
+    } else {
+      // multi-attribute index
+      which = nullptr;
+    }
+
+    costs =
+        calculateIndexCosts(index, which, itemsInIndex, values, _found.size());
+  }
+
+  // honor the costs of post-index filter conditions
+  costs.estimatedCosts += costs.estimatedItems * postFilterConditions;
+
+  return costs;
+}
+
 /// @brief specialize the condition for the index
 /// this is used for the primary index and the edge index
 /// requires that a previous matchOne() returned true
@@ -142,6 +230,90 @@ arangodb::aql::AstNode* SimpleAttributeEqualityMatcher::specializeOne(
         return node;
       }
     }
+  }
+
+  TRI_ASSERT(false);
+  return node;
+}
+
+/// @brief specialize the condition for the index
+/// this is used for the hash index
+/// requires that a previous matchAll() returned true
+arangodb::aql::AstNode* SimpleAttributeEqualityMatcher::specializeAll(
+    arangodb::Index const* index, arangodb::aql::AstNode* node,
+    arangodb::aql::Variable const* reference) {
+  arangodb::containers::FlatHashSet<std::string> nonNullAttributes;
+  _found.clear();
+
+  // must edit in place, no access to AST; TODO change so we can replace with
+  // copy
+  TEMPORARILY_UNLOCK_NODE(node);
+
+  size_t const n = node->numMembers();
+
+  for (size_t i = 0; i < n; ++i) {
+    auto op = node->getMember(i);
+
+    if (index->sparse() &&
+        (op->type == arangodb::aql::NODE_TYPE_OPERATOR_BINARY_NE ||
+         op->type == arangodb::aql::NODE_TYPE_OPERATOR_BINARY_GT)) {
+      TRI_ASSERT(op->numMembers() == 2);
+
+      // track != null && > null, though no index will use them directly
+      // however, we need to track which attributes are null in order to
+      // use sparse indexes properly
+      accessFitsIndex(index, op->getMember(0), op->getMember(1), op, reference,
+                      nonNullAttributes, false);
+      accessFitsIndex(index, op->getMember(1), op->getMember(0), op, reference,
+                      nonNullAttributes, false);
+    } else if (op->type == arangodb::aql::NODE_TYPE_OPERATOR_BINARY_EQ) {
+      TRI_ASSERT(op->numMembers() == 2);
+      if (accessFitsIndex(index, op->getMember(0), op->getMember(1), op,
+                          reference, nonNullAttributes, false) ||
+          accessFitsIndex(index, op->getMember(1), op->getMember(0), op,
+                          reference, nonNullAttributes, false)) {
+        TRI_IF_FAILURE("SimpleAttributeMatcher::specializeAllChildrenEQ") {
+          THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
+        }
+        if (_found.size() == _attributes.size()) {
+          // got enough attributes
+          break;
+        }
+      }
+    } else if (op->type == arangodb::aql::NODE_TYPE_OPERATOR_BINARY_IN) {
+      TRI_ASSERT(op->numMembers() == 2);
+      if (accessFitsIndex(index, op->getMember(0), op->getMember(1), op,
+                          reference, nonNullAttributes, false)) {
+        TRI_IF_FAILURE("SimpleAttributeMatcher::specializeAllChildrenIN") {
+          THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
+        }
+        if (_found.size() == _attributes.size()) {
+          // got enough attributes
+          break;
+        }
+      }
+    }
+  }
+
+  if (_found.size() == _attributes.size()) {
+    // remove node's existing members
+    node->clearMembers();
+
+    // found contains all nodes required for this condition sorted by
+    // _attributes
+    // now re-add only those
+    for (size_t i = 0; i < _attributes.size(); ++i) {
+      // This is always save due to
+      auto it = _found.find(i);
+      TRI_ASSERT(it != _found.end());  // Found contains by def. 1 Element for
+                                       // each _attribute
+
+      TRI_ASSERT(it->second->type !=
+                 arangodb::aql::NODE_TYPE_OPERATOR_BINARY_NE);
+      node->addMember(it->second);
+    }
+
+    return node;
   }
 
   TRI_ASSERT(false);

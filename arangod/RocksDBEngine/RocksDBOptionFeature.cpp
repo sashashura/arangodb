@@ -43,6 +43,7 @@
 #include "RocksDBEngine/RocksDBColumnFamilyManager.h"
 #include "RocksDBEngine/RocksDBPrefixExtractor.h"
 
+#include <rocksdb/filter_policy.h>
 #include <rocksdb/options.h>
 #include <rocksdb/slice_transform.h>
 #include <rocksdb/table.h>
@@ -541,7 +542,8 @@ void RocksDBOptionFeature::collectOptions(
       RocksDBColumnFamilyManager::Family::VPackIndex,
       RocksDBColumnFamilyManager::Family::GeoIndex,
       RocksDBColumnFamilyManager::Family::FulltextIndex,
-      RocksDBColumnFamilyManager::Family::ReplicatedLogs};
+      RocksDBColumnFamilyManager::Family::ReplicatedLogs,
+      RocksDBColumnFamilyManager::Family::HashvalueIndex};
 
   auto addMaxWriteBufferNumberCf =
       [this, &options](RocksDBColumnFamilyManager::Family family) {
@@ -748,6 +750,17 @@ rocksdb::ColumnFamilyOptions RocksDBOptionFeature::columnFamilyOptions(
       options.table_factory = std::shared_ptr<rocksdb::TableFactory>(
           rocksdb::NewBlockBasedTableFactory(tableOptions));
       options.comparator = _vpackCmp.get();
+      break;
+    }
+    case RocksDBColumnFamilyManager::Family::HashvalueIndex: {
+      rocksdb::BlockBasedTableOptions tableOptions(tableBase);
+      tableOptions.filter_policy.reset(rocksdb::NewBloomFilterPolicy(10, true));
+      tableOptions.whole_key_filtering = false;
+      options.table_factory.reset(
+          rocksdb::NewBlockBasedTableFactory(tableOptions));
+
+      options.prefix_extractor = std::shared_ptr<rocksdb::SliceTransform const>(
+          rocksdb::NewFixedPrefixTransform(RocksDBKey::objectIdSize() + 8));
       break;
     }
   }
