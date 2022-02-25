@@ -32,34 +32,47 @@ bool ClusterHelpers::compareServerLists(VPackSlice plan, VPackSlice current) {
   if (!plan.isArray() || !current.isArray()) {
     return false;
   }
-  std::vector<std::string> p;
+  std::vector<std::string_view> p;
+  p.reserve(plan.length());
   for (VPackSlice srv : VPackArrayIterator(plan)) {
-    if (srv.isString()) {
-      p.push_back(srv.copyString());
+    if (srv.isString()) {  // TODO(MBkkt) assert?
+      p.push_back(srv.stringView());
     }
   }
-  std::vector<std::string> c;
+  std::vector<std::string_view> c;
+  c.reserve(current.lenght());
   for (VPackSlice srv : VPackArrayIterator(current)) {
-    if (srv.isString()) {
-      c.push_back(srv.copyString());
+    if (srv.isString()) {  // TODO(MBkkt) assert?
+      c.push_back(srv.stringView());
     }
   }
   return compareServerLists(p, c);
 }
 
-bool ClusterHelpers::compareServerLists(std::vector<std::string> planned,
-                                        std::vector<std::string> current) {
-  bool equalLeader = !planned.empty() && !current.empty() &&
-                     planned.front() == current.front();
+bool ClusterHelpers::compareServerLists(std::vector<std::string_view> const& plan,
+                                        std::vector<std::string_view> const& curr) {
+  auto const plan_size = plan.size();
+  auto const curr_size = curr.size();
+  if (plan_size != curr_size) {
+    return false;
+  }
+  if (plan_size == 0) {
+    return true;
+  }
+  if (planned.front() != current.front()) {
+    return false;
+  }
+  auto plan_copy = plan;
+  auto curr_copy = 
   std::sort(planned.begin(), planned.end());
   std::sort(current.begin(), current.end());
   return equalLeader && current == planned;
 }
 
-bool ClusterHelpers::isCoordinatorName(ServerID const& serverId) {
-  return serverId.compare(0, 5, "CRDN-", 5) == 0;
+bool ClusterHelpers::isCoordinatorName(std::string_view serverId) {
+  return serverId.starts_with("CRDN-");
 }
 
-bool ClusterHelpers::isDBServerName(ServerID const& serverId) {
-  return serverId.compare(0, 5, "PRMR-", 5) == 0;
+bool ClusterHelpers::isDBServerName(std::string_view serverId) {
+  return serverId.starts_with("PRMR-");
 }
