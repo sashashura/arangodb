@@ -463,6 +463,19 @@ template<class Inspector>
 auto inspect(Inspector& f, Struct2& x) {
   return f.object(x).fields(f.field("v", x.v));
 }
+
+enum class MyEnum {
+  kValue1,
+  kValue2,
+  kValue3 = kValue2,
+};
+
+template<class Inspector>
+auto inspect(Inspector& f, MyEnum& x) {
+  return f.enumeration(x).values(MyEnum::kValue1, "value1",  //
+                                 MyEnum::kValue2, "value2");
+}
+
 }  // namespace
 
 namespace {
@@ -862,6 +875,26 @@ TEST_F(VPackSaveInspectorTest, store_unqualified_variant) {
 
   EXPECT_EQ(1, slice["e"].length());
   EXPECT_TRUE(slice["e"]["nil"].isEmptyObject());
+}
+
+TEST_F(VPackSaveInspectorTest, store_enum) {
+  std::vector<MyEnum> enums{MyEnum::kValue1, MyEnum::kValue2, MyEnum::kValue3};
+  auto result = inspector.apply(enums);
+  ASSERT_TRUE(result.ok());
+
+  velocypack::Slice slice = builder.slice();
+  ASSERT_TRUE(slice.isArray());
+  ASSERT_EQ(3, slice.length());
+  EXPECT_EQ("value1", slice[0].copyString());
+  EXPECT_EQ("value2", slice[1].copyString());
+  EXPECT_EQ("value2", slice[2].copyString());
+}
+
+TEST_F(VPackSaveInspectorTest, store_enum_returns_error_for_unknown_value) {
+  MyEnum val = static_cast<MyEnum>(42);
+  auto result = inspector.apply(val);
+  ASSERT_FALSE(result.ok());
+  EXPECT_EQ("Unknown enum value 42", result.error());
 }
 
 struct VPackLoadInspectorTest : public ::testing::Test {
@@ -1971,6 +2004,41 @@ TEST_F(VPackLoadInspectorTest, load_type_with_unsafe_fields) {
   EXPECT_EQ(builder.slice()["hashed"].stringView().data(), u.hashed.data());
 }
 
+TEST_F(VPackLoadInspectorTest, load_enum) {
+  builder.openArray();
+  builder.add(VPackValue("value1"));
+  builder.add(VPackValue("value2"));
+  builder.close();
+  arangodb::inspection::VPackLoadInspector inspector{builder};
+
+  std::vector<MyEnum> enums;
+  auto result = inspector.apply(enums);
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(2, enums.size());
+  EXPECT_EQ(MyEnum::kValue1, enums[0]);
+  EXPECT_EQ(MyEnum::kValue2, enums[1]);
+}
+
+TEST_F(VPackLoadInspectorTest, load_enum_returns_error_when_not_string) {
+  builder.add(VPackValue(42));
+  arangodb::inspection::VPackLoadInspector inspector{builder};
+
+  MyEnum myEnum;
+  auto result = inspector.apply(myEnum);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ("Expecting type String", result.error());
+}
+
+TEST_F(VPackLoadInspectorTest, load_enum_returns_error_when_value_is_unknown) {
+  builder.add(VPackValue("unknownValue"));
+  arangodb::inspection::VPackLoadInspector inspector{builder};
+
+  MyEnum myEnum;
+  auto result = inspector.apply(myEnum);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ("Unknown enum value unknownValue", result.error());
+}
+
 struct VPackInspectionTest : public ::testing::Test {};
 
 TEST_F(VPackInspectionTest, serialize) {
@@ -2053,3 +2121,8 @@ TEST_F(VPackInspectionTest, GenericEnumClass) {
 }
 
 }  // namespace
+
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}

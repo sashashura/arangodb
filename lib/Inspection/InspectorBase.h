@@ -28,6 +28,7 @@
 #include <functional>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 #include <velocypack/Iterator.h>
@@ -48,6 +49,9 @@ struct InspectorBase {
  protected:
   template<class T>
   struct Object;
+
+  template<class T>
+  struct Enum;
 
   template<class... Ts>
   struct Variant;
@@ -76,6 +80,12 @@ struct InspectorBase {
   template<class T>
   [[nodiscard]] Object<T> object(T& o) noexcept {
     return Object<T>{self(), o};
+  }
+
+  template<class T>
+  [[nodiscard]] Enum<T> enumeration(T& e) noexcept {
+    static_assert(std::is_enum_v<T>);
+    return Enum<T>{self(), e};
   }
 
   template<class... Ts>
@@ -343,11 +353,75 @@ struct InspectorBase {
 
    private:
     friend struct InspectorBase;
-    explicit Object(Derived& inspector, T& o)
-        : inspector(inspector), object(o) {}
+    Object(Derived& inspector, T& o) : inspector(inspector), object(o) {}
 
     Derived& inspector;
     T& object;
+  };
+
+  template<class T>
+  struct Enum {
+    template<class Arg, class... Args>
+    [[nodiscard]] Status values(T v, Arg&& a, Args&&... args) {
+      if constexpr (Derived::isLoading) {
+        std::string read;             // TODO - load as string_view
+        return inspector.apply(read)  //
+               | [&]() {
+                   return load(read, v, std::forward<Arg>(a),
+                               std::forward<Args>(args)...);
+                 };
+      } else {
+        return store(v, std::forward<Arg>(a), std::forward<Args>(args)...);
+      }
+    }
+
+   private:
+    friend struct InspectorBase;
+    Enum(Derived& inspector, T& v) : inspector(inspector), value(v) {}
+
+    template<class Arg, class... Args>
+    Status load(std::string const& read, T v, Arg&& a, Args&&... args) {
+      static_assert(
+          std::is_constructible_v<std::string, Arg>,
+          "At the moment enum values can only be mapped to string values");
+      if (read == a) {
+        this->value = v;
+        return Status{};
+      }
+      return load(read, std::forward<Args>(args)...);
+    }
+
+    Status load(std::string const& read) {
+      return {"Unknown enum value " + read};
+    }
+
+    template<class Arg, class... Args>
+    Status store(T v, Arg&& a, Args&&... args) {
+      static_assert(
+          std::is_constructible_v<std::string, Arg>,
+          "At the moment enum values can only be mapped to string values");
+      if (value == v) {
+        return inspector.apply(convert(std::forward<Arg>(a)));
+      }
+      return store(std::forward<Args>(args)...);
+    }
+
+    Status store() {
+      return {"Unknown enum value " +
+              std::to_string(static_cast<std::size_t>(value))};
+    }
+
+    template<std::size_t N>
+    std::string_view convert(char const (&v)[N]) {
+      return std::string_view(v, N - 1);
+    }
+    template<class TT>
+    auto convert(TT&& v) {
+      return std::forward<TT>(v);
+    }
+
+    Derived& inspector;
+    T& value;
   };
 
   template<template<class...> class DerivedVariant, class... Ts>
