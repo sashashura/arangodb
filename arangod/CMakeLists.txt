@@ -323,26 +323,6 @@ set(LIB_ARANGO_INDEXES_SOURCES
   Indexes/SortedIndexAttributeMatcher.cpp
 )
 
-set(LIB_ARANGO_CACHE_SOURCES
-  Cache/BucketState.cpp
-  Cache/Cache.cpp
-  Cache/CacheManagerFeature.cpp
-  Cache/CacheManagerFeatureThreads.cpp
-  Cache/CachedValue.cpp
-  Cache/Finding.cpp
-  Cache/Manager.cpp
-  Cache/ManagerTasks.cpp
-  Cache/Metadata.cpp
-  Cache/PlainBucket.cpp
-  Cache/PlainCache.cpp
-  Cache/Rebalancer.cpp
-  Cache/Table.cpp
-  Cache/Transaction.cpp
-  Cache/TransactionManager.cpp
-  Cache/TransactionalBucket.cpp
-  Cache/TransactionalCache.cpp
-)
-
 set(LIB_ARANGO_REPLICATION_SOURCES
   Replication/DatabaseInitialSyncer.cpp
   Replication/DatabaseTailingSyncer.cpp
@@ -761,10 +741,6 @@ add_library(arango_indexes STATIC
   ${LIB_ARANGO_INDEXES_SOURCES}
 )
 
-add_library(arango_cache STATIC
-  ${LIB_ARANGO_CACHE_SOURCES}
-)
-
 add_library(arango_replication STATIC
   ${LIB_ARANGO_REPLICATION_SOURCES}
 )
@@ -833,10 +809,6 @@ target_link_libraries(arango_agency arango)
 target_link_libraries(arango_agency arango_health)
 target_link_libraries(arango_agency arango_iresearch)
 target_link_libraries(arango_agency arango_metrics)
-
-target_link_libraries(arango_cache arango)
-target_link_libraries(arango_cache arango::validation)
-target_link_libraries(arango_cache boost_system)
 
 target_link_libraries(arango_cluster_engine arango_health)
 target_link_libraries(arango_cluster_engine arango_indexes)
@@ -1023,7 +995,6 @@ endif ()
 
 foreach(TARGET
   arango_agency
-  arango_cache
   arango_cluster_engine
   arango_cluster_methods
   arango_common_rest_handler
@@ -1074,4 +1045,5 @@ install_command_alias(${BIN_ARANGOD}
 install_config(arango-init-database)
 
 add_subdirectory(Aql)
+add_subdirectory(Cache)
 add_subdirectory(Pregel)
