@@ -270,7 +270,6 @@ const graphGenerator = function (verticesEdgesGenerator) {
                 }
                 break;
         }
-        // console.warn(edges);
         return {vertices, edges};
     };
 
@@ -279,7 +278,66 @@ const graphGenerator = function (verticesEdgesGenerator) {
      * Layer i to Layer i+1. Edges between vertices of the same layer all go to the same direction and edges of two
      * layers go to the same direction. If parameter kind is "zigzag", edges within one layer go to the same direction,
      * but edges between neighbor layers go to the opposite directions. If parameter
-     * kind is "bidirected", the graph is undirected. The vertices are enumerated layer-wise: the first layer gets
+     * kind is "bidirected", the graph is bidirected. The vertices are enumerated layer-wise: the first layer gets
+     * indexes 0, 1, ..., thickness - 1, the second one thickness, thickness + 1, 2*thickness -1 etc.
+     * @param numberLayers the number of layers between source and target
+     * @param thickness the number of vertices in each layer
+     * @param kind "directed", "zigzag" or "bidirected"
+     */
+
+    const makeGrid = function (numberLayers, thickness, kind) {
+        assertTrue(numberLayers > 1,
+            `makeGrid: numberLayers should be at least 2, it is ${numberLayers}`);
+        assertTrue(thickness > 1,
+            `makeGrid: thickness should be at least 2, it is ${thickness}`);
+        assertTrue(kind === "directed" || kind === "zigzag" || kind === "bidirected",
+            `makeGrid: kind should one of {"directed", "zigzag", "bidirected"}, it is ${kind}`);
+        let vertices = makeVertices(numberLayers * thickness);
+        let edges = [];
+        for (let layer = 0; layer < numberLayers; ++layer) {
+            // edges within one layer
+            for (let i = 0; i < thickness - 1; ++i) {
+                const s = layer * thickness + i;
+                const t = s + 1;
+                switch (kind) {
+                    case "directed":
+                        edges.push(makeEdge(s, t));
+                        break;
+                    case "zigzag":
+                        if (layer % 2 === 0) {
+                            edges.push(makeEdge(s, t));
+                        } else {
+                            edges.push(makeEdge(t, s));
+                        }
+                        break;
+                    case "bidirected":
+                        edges.push(makeEdge(s, t));
+                        edges.push(makeEdge(t, s));
+                        break;
+                }
+            }
+            // edges between layers: from previous layer to current layer (and back if "bidirected")
+            if (layer === 0) {
+                continue;
+            }
+            for (let i = 0; i < thickness; ++i) {
+                const t = layer * thickness + i;
+                const s = t - thickness;
+                edges.push(makeEdge(s, t));
+                if (kind === "bidirected") {
+                    edges.push(makeEdge(t, s));
+                }
+            }
+        }
+        return {vertices, edges};
+    };
+
+    /**
+     * Creates a grid with dimensions numberLayers x thickness. If parameter kind is "directed", the edges go from
+     * Layer i to Layer i+1. Edges between vertices of the same layer all go to the same direction and edges of two
+     * layers go to the same direction. If parameter kind is "zigzag", edges within one layer go to the same direction,
+     * but edges between neighbor layers go to the opposite directions. If parameter
+     * kind is "bidirected", the graph is bidirected. The vertices are enumerated layer-wise: the first layer gets
      * indexes 0, 1, ..., thickness - 1, the second one thickness, thickness + 1, 2*thickness -1 etc.
      * @param numberLayers the number of layers between source and target
      * @param thickness the number of vertices in each layer

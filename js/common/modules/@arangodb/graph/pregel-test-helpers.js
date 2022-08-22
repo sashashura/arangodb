@@ -39,10 +39,6 @@ let internal = require("internal");
 let pregel = require("@arangodb/pregel");
 let graphGeneration = require("@arangodb/graph/graphs-generation");
 
-const Kleinberg = "Kleinberg";
-const Graetzer = "Graetzer";
-const Wiki = "Wiki";
-
 const graphGenerator = graphGeneration.graphGenerator;
 
 const loadGraphGenerators = function (isSmart) {
@@ -1835,12 +1831,6 @@ function makeSSSPTestSuite(isSmart, smartAttribute, numberOfShards) {
 
     const verticesEdgesGenerator = loadGraphGenerators(isSmart).verticesEdgesGenerator;
     const makeEdgeBetweenVertices = loadGraphGenerators(isSmart).makeEdgeBetweenVertices;
-
-
-    // only for debugging
-    const printVertexKey = function (vertex) {
-        console.warn(`printVertexKey: ${vertex._key}`);
-    };
 
     /**
      *
