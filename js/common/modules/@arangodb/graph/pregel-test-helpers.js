@@ -413,6 +413,7 @@ const testComponentsAlgorithmOnDisjointComponents = function (componentGenerator
 
 
 class Vertex {
+
     constructor(key, label, value = 0) {
         this.outEdges = [];
         this.outNeighbors = new Set();
@@ -452,7 +453,6 @@ class Graph {
             }
             console.warn("End vertices");
         }
-
     }
 
     /**
