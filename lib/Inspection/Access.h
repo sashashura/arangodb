@@ -334,7 +334,10 @@ struct Access<std::reference_wrapper<T>>
     : AccessBase<std::reference_wrapper<T>> {
   template<class Inspector>
   static auto apply(Inspector& f, std::reference_wrapper<T>& x) {
-    static_assert(!Inspector::isLoading);
+    static_assert(!Inspector::isLoading,
+                  "a reference_wrapper cannot be deserialized because it "
+                  "cannot be default constructed (default construction is "
+                  "required for the deserialization result type)");
     return f.apply(x.get());
   }
 };
